@@ -1,6 +1,8 @@
 """
 This program generates the Burning Man map that will be displayed in the receiver.
 
+Requires Python 3 (tested with 3.7.4)
+
 The GPS coordinates and other BRC layout info come from http://innovate.burningman.org/datasets-page/
 (And more specifically, for 2019: https://bm-innovate.s3.amazonaws.com/2019/2019_BRC_Measurements.pdf)
 
@@ -104,7 +106,7 @@ def polar2px(a, d):
 
 
 def draw_map():
-  im = Image.new('L', (img_width - 1, img_height), 'black')
+  im = Image.new('1', (img_width - 1, img_height), 'black')
   draw = ImageDraw.Draw(im)
 
   # Annulars: draw every other road
@@ -147,6 +149,7 @@ def draw_map():
 
   del draw
   im.save('map.png')
+  output_code(im)
   im.show()
 
 
@@ -216,6 +219,37 @@ def gps_dist(p1, p2):
 
 def avg_fence_point_distance():
   return round(sum([gps_dist(man_coords, p) for p in fence_point_coords]) / 5)
+
+def output_code(img):
+  """
+  Converts the image to cpp code
+  This is equivalent to http://javl.github.io/image2cpp/
+  """
+
+  # This works because we create the image with Image.new('1', ...)
+  # The '1' tells PIL to store the image with 1 bit per pixel, which is the format we want
+  bytes = img.tobytes(encoder_name='raw')
+
+  bytes_per_line = int(img.width / 8)
+  lines = []
+  last_non_empty = -1
+  for i in range(0, len(bytes), bytes_per_line):
+    # Get one image line (128 pixels) worth of bytes
+    line = bytes[i:i+bytes_per_line]
+
+    if any(line):  # if this is not an empty line
+        last_non_empty = len(lines)
+    elif last_non_empty == -1:
+      continue  # Skip empty lines at the beginning
+
+    # Convert to hex
+    lines.append("".join("0x{:02x}, ".format(x) for x in line))
+
+  code = "// Burning Man map, {0}x{1}px\n".format(img.width, len(lines))
+  code = code + "const unsigned char map[] PROGMEM = {\n\t"
+  code = code + "\n\t".join(lines[0:last_non_empty+1])
+  code = code[:-2] + "\n};"
+  print(code)
 
 
 if __name__ == '__main__':
