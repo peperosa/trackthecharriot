@@ -245,9 +245,11 @@ def output_code(img):
     # Convert to hex
     lines.append("".join("0x{:02x}, ".format(x) for x in line))
 
-  code = "// Burning Man map, {0}x{1}px\n".format(img.width, len(lines))
+
+  trimmed_lines = lines[0:last_non_empty+1]
+  code = "// Burning Man map, {0}x{1}px\n".format(img.width, len(trimmed_lines))
   code = code + "const unsigned char map[] PROGMEM = {\n\t"
-  code = code + "\n\t".join(lines[0:last_non_empty+1])
+  code = code + "\n\t".join(trimmed_lines)
   code = code[:-2] + "\n};"
   print(code)
 
