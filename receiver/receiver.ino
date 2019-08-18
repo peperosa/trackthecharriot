@@ -3,10 +3,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define BUTTON_A  9
-#define BUTTON_B  6
-#define BUTTON_C  5
-
 Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 
 // Burning Man map, 128x169px
@@ -182,39 +178,82 @@ const unsigned char bm_map[] PROGMEM = {
     0x00, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00
 };
 
-const int map_height = sizeof(bm_map) / 16;
+// arrow icons, 8x8px
+const unsigned char up_arrow [] PROGMEM = { 0x10, 0x38, 0x7c, 0xfe, 0x38, 0x38, 0x38, 0x38 };
+const unsigned char dn_arrow [] PROGMEM = { 0x38, 0x38, 0x38, 0x38, 0xfe, 0x7c, 0x38, 0x10 };
+
+
+#define BUTTON_A  9
+#define BUTTON_B  6
+#define BUTTON_C  5
+
+#define MAP_HEIGHT     (sizeof(bm_map) / 16)
+#define SCREEN_HEIGHT  32
+#define SCROLL_SPEED   4  // How many pixels we scroll the map on each button press
+#define MAN_X          64
+#define MAN_Y          76
+
 int y_pos = 76;
+unsigned long time = 0;
 
 void setup() {
   Serial.begin(9600);
-  Serial.write("Track The Chariot!");
-
-  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+  Serial.println("Track The Chariot!");
 
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
 
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
-  display.println("Hello world");
+  //display.println("Hello world");
   display.display();
 }
 
+
+/**
+ * Draws an animated circle at pixel coordinates (x, y)
+ * If the circle would not be visible (because the screen is scrolled too far up or down)
+ * draw a blinking arrow instead
+ */
+void drawTarget(int x, int y) {
+  // Take the time in milliseconds, modulo 512. This is used for the animation.
+  int t = 512 - (millis() % 512);
+
+  if (y_pos > y + 7) {
+    // Target is too high, draw a blinking up arrow
+    if (t > 256) { display.drawBitmap(61, 0, up_arrow, 8, 8, WHITE); }
+  } else if (y_pos + SCREEN_HEIGHT < y - 7) {
+    // Target is too low, draw a blinking down arrow
+    if (t > 256) { display.drawBitmap(61, SCREEN_HEIGHT - 8, dn_arrow, 8, 8, WHITE); }
+  } else {
+    // Draw 2 animated circles converging to the target
+    display.drawCircle(x, y - y_pos, t / 32, WHITE);
+    display.drawCircle(x, y - y_pos, t / 64, WHITE);
+  }
+}
+
 void loop() {
+  time = millis();
   if (!digitalRead(BUTTON_A)) {
-    y_pos = max(y_pos - 4, 0);
+    y_pos = max(y_pos - SCROLL_SPEED, 0);
   }
   if (!digitalRead(BUTTON_C)) {
-    y_pos = min(y_pos + 4, map_height-32);
+    y_pos = min(y_pos + SCROLL_SPEED, MAP_HEIGHT - 32);
+  }
+
+  if (!digitalRead(BUTTON_B)) {
   }
 
   display.clearDisplay();
-  display.drawBitmap(0, 0, bm_map + y_pos*16, 128, 32, WHITE);
-  display.display();
+  display.drawBitmap(0, 0, bm_map + y_pos * 16, 128, 32, WHITE);
 
+  drawTarget(64, 50);
+
+  display.display();
   delay(1);
 }
