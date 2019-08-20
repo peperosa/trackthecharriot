@@ -1,4 +1,3 @@
-
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -119,32 +118,19 @@ int32_t theirLon;
 bool areTheyAccurate;
 
 // timeout for RX --> if not receiving a signal in more than 20s --> error message
-#define MAX_RX_INTERVAL 20000
+#define MAX_RX_INTERVAL 30000
 
 void loop() {
 
+
+  long sinceLastRX = millis() - lastRecv;
+  
   if (rf95.available())
   {
     // Should be a message for us now
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
 
-    long sinceLastRX = millis() - lastRecv;
-    if (sinceLastRX > MAX_RX_INTERVAL) {
-        display.clearDisplay();
-        display.setTextSize(1);
-        display.setTextColor(WHITE);      
-        display.setCursor(0, 0);      
-        display.println("OOPS noRX");                
-        display.setCursor(0, 8);      
-        display.println("Explore");       
-        display.setCursor(0, 16);      
-        display.println("and enjoy )'(");                      
-        display.setCursor(0, 24);      
-        display.println("the charriot will find u");                
-        display.display();      
-    } 
-      
     if (rf95.recv(buf, &len))
     { 
       count_alive = count_alive + 1; 
@@ -194,9 +180,8 @@ void loop() {
     }
     else
     {
-      Serial.println("Receive failed");
-    
-      if (sinceLastRX > MAX_RX_INTERVAL) {
+      Serial.println("Receive failed");      
+      if (sinceLastRX < 0 || sinceLastRX > MAX_RX_INTERVAL) {
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(WHITE);      
@@ -212,11 +197,30 @@ void loop() {
       } 
     }
   }  
+  else
+  { 
+    Serial.println("Receive not available");
+    Serial.println(String(sinceLastRX));      
+    if (sinceLastRX < 0 || sinceLastRX > MAX_RX_INTERVAL) {      
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(WHITE);      
+        display.setCursor(0, 0);      
+        display.println("OOPS noRX");                
+        display.setCursor(0, 8);      
+        display.println("Explore");       
+        display.setCursor(0, 16);      
+        display.println("and enjoy )'(");                      
+        display.setCursor(0, 24);      
+        display.println("charriot may find u");                
+        display.display();      
+    }       
+  }
 }
 
 String fmtPlayaStr(int32_t lat, int32_t lon, bool accurate) {
   if (lat == 0 && lon == 0) {
-    return "404 charriot not found";
+    return "404CharriotNotFound";
   } else {
     return playaStr(lat, lon, accurate);
   }

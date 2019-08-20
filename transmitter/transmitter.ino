@@ -17,6 +17,9 @@
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
+// Blinky on transmit
+#define LED 13
+
 // timing
 #define TRANSMIT_INTERVAL 5000      // interval between sending updates
 #define MAX_FIX_AGE 5000   // Ignore data from GPS if older than this
@@ -35,14 +38,12 @@ TinyGPS gps;
 
 void setup() 
 {
+  
+  pinMode(LED, OUTPUT);
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
   Serial.begin(9600);
-  while (!Serial) {
-    delay(1);
-  }
-
   delay(100);
 
   Serial.println("Feather LoRa TX Test!");
@@ -99,12 +100,16 @@ bool areTheyAccurate;
 //int16_t packetnum = 0;  // packet counter, we increment per xmission
 
 void transmitData() {
+  /*
+  // even if GPS is stale I still want to transmit 0lat/lon
   long sinceLastFix = millis() - lastFix;
   if (sinceLastFix > MAX_FIX_AGE) {
     // GPS data is stale
     return;
   }
-
+  */
+ 
+  digitalWrite(LED, HIGH);
   uint8_t len = 2 * sizeof(int32_t) + sizeof(uint8_t) + MAGIC_NUMBER_LEN + 1;
   uint8_t radiopacket[len];
   for (int i = 0; i < MAGIC_NUMBER_LEN; i++) {
@@ -146,6 +151,7 @@ void transmitData() {
     }
   sending = false;
   lastSend = millis();
+  digitalWrite(LED, LOW);
 }
 
 // production - burning man
@@ -205,7 +211,7 @@ void loop() {
   }
 
   long sinceLastTransmit = millis() - lastSend;
-  if (sinceLastTransmit < 0 || sinceLastTransmit > TRANSMIT_INTERVAL) {    
+  if (sinceLastTransmit < 0 || sinceLastTransmit > TRANSMIT_INTERVAL) {
     transmitData();
   }
 
