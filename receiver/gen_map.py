@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw
 from math import *
 
 # GPS coordinates of the man
-man_coords = (40.785980, -119.205840)
+man_coords = (40.78598, -119.20584)
 
 # GPS coordinates of each fence point
 fence_point_coords = [
