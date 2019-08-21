@@ -9,7 +9,7 @@
 #define MAN_LAT     4078598  // 40.78598 degrees
 #define MAN_LON   -11920584  // -119.20584 degrees
 
-  
+
 // The data that we are going to send over the radio
 struct Payload {
   // Magic number to identify the transmission as ours. Just 2 random bytes.
