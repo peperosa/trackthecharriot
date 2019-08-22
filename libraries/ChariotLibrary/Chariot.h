@@ -9,19 +9,16 @@
 #define MAN_LAT     4078598  // 40.78598 degrees
 #define MAN_LON   -11920584  // -119.20584 degrees
 
+#define SENDER_ID      0x3f
+#define RECEIVER_ID    0x58
+#define MESSAGE_ID     0xad
+
 
 // The data that we are going to send over the radio
 struct Payload {
-  // Magic number to identify the transmission as ours. Just 2 random bytes.
-  const uint8_t magic[2] = {0x3f, 0x58};
-
-  // Latitude and longitude of the GPS fix in 100,000ths of a degree **relative to the man**.
-  // Using relative coordinates allows us to save space by using only 2 bytes for each coordinate instead of 4. This
-  // in turn makes the radio transmission faster and offers less opportunity for transmission errors.
-  // Note: since these coordinates are 16 bit integers, they can only represent a distance of at most 0.32767 degrees
-  // in either direction from the Man, which is at least 25km in each direction, so this should be plenty.
-  int16_t lat = 0;
-  int16_t lon = 0;
+  // Latitude and longitude of the GPS fix in millionths of a degree (-123.45678 => -123,456,780)
+  int32_t lat = 0;
+  int32_t lon = 0;
 
   // How old the GPS fix is, in minutes. 1 byte, so max age is 255 minutes (~4h)
   // This is set to 255 if we haven't gotten a fix yet or if it's more than 255 minutes.
@@ -37,7 +34,7 @@ struct Payload {
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
-// Enters an infinite loop, blinking the LED to indicate an error
+// Enters an infinite loop, blinking the LED quickly to indicate an error
 void die() {
   pinMode(13, OUTPUT);
   while (1) {
@@ -47,7 +44,7 @@ void die() {
 }
 
 // Initializes the radio
-void initRadio() {
+void initRadio(uint8_t address) {
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
@@ -74,7 +71,10 @@ void initRadio() {
   // The default transmitter power is 13dBm, using PA_BOOST.
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then
   // you can set transmitter powers from 5 to 23 dBm:
-  rf95.setTxPower(23, false);
+  //rf95.setTxPower(23, false);
+
+  rf95.setThisAddress(address);
+  rf95.setPromiscuous(false);
 }
 
 #endif //COMMON_H

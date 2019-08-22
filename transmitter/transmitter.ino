@@ -1,8 +1,9 @@
 #include <SPI.h>
 #include <TinyGPS.h>
-#include "common.h"
+#include <Chariot.h>
 
 #define GPSSerial Serial1
+//#define GPSSerial Serial
 
 TinyGPS gps;
 
@@ -14,13 +15,13 @@ uint32_t last_sent = 0; // timestamp in ms when we last sent the data
 
 void setup() 
 {
+  pinMode(13, OUTPUT);
+
   Serial.begin(9600);
-  while (!Serial) {
-    delay(1);
-  }
+  delay(100);
   Serial.println("Track The Chariot - transmitter");
 
-  initRadio();
+  initRadio(SENDER_ID);
 
   // 9600 baud is the default rate for the GPS
   GPSSerial.begin(9600);
@@ -35,6 +36,12 @@ void loop() {
 }
 
 void readGPS() {
+  last_fix = 100;
+  payload.lat = 123;
+  payload.lon = 456;
+  return;
+
+
   // Read the next character from the GPS serial port and pass it to TinyGPS for decoding
   if (!GPSSerial.available() || !gps.encode(GPSSerial.read())) {
     return;  // We don't have a full sentence yet
@@ -55,16 +62,21 @@ void readGPS() {
   }
 
   last_fix = millis() - age;
-  payload.lat = lat / 10 - MAN_LAT;
-  payload.lon = lon / 10 - MAN_LON;
+  payload.lat = lat;
+  payload.lon = lon;
 }
 
 void transmitData() {
   // Compute the fix age in minutes, cap it to 0xff if it's greater than that.
   payload.fix_age_minutes = last_fix > 0 ? min(0xff, (millis() - last_fix) / 60000) : 0xff;
 
+  rf95.setHeaderFrom(SENDER_ID);
+  rf95.setHeaderTo(RECEIVER_ID);
+  rf95.setHeaderId(MESSAGE_ID);
+  digitalWrite(13, HIGH);
   rf95.send((uint8_t*) &payload, sizeof(payload));
-  RH_RF95::printBuffer("Sending: ", (uint8_t*) &payload, sizeof(payload));
+  //RH_RF95::printBuffer("Sending: ", (uint8_t*) &payload, sizeof(payload));
   rf95.waitPacketSent();
+  digitalWrite(13, LOW);;
   last_sent = millis();
 }
