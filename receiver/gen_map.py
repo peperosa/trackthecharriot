@@ -19,12 +19,14 @@ man_coords = (40.78598, -119.20584)
 
 # GPS coordinates of each fence point
 fence_point_coords = [
-  (40.78236, -119.23530),
-  (40.80570, -119.21965),
-  (40.80163, -119.18533),
-  (40.77568, -119.17971),
-  (40.76373, -119.21050),
+  (40.78236, -119.23530),  # bottom left
+  (40.80570, -119.21965),  # top left
+  (40.80163, -119.18533),  # top point (directly above the Man)
+  (40.77568, -119.17971),  # top right
+  (40.76373, -119.21050),  # bottom right
 ]
+
+TOP_FENCE_PT = 2  # index in fence_point_coords of the top fence point
 
 # Size of the image in pixels
 img_width = 129  # Using an odd width makes everything easier, especially for drawing circles
@@ -150,7 +152,7 @@ def draw_map():
   del draw
   im.save('map.png')
   output_code(im)
-  im.show()
+  # im.show()
 
 
 def circle_points(center, radius, start=0, end=0):
@@ -200,7 +202,7 @@ def circle_points(center, radius, start=0, end=0):
 
 
 def gps_dist(p1, p2):
-  """Distance between 2 GPS coordinates.
+  """Returns the distance and angle between 2 GPS coordinates.
 
   Source: https://www.movable-type.co.uk/scripts/latlong.html
   Uses the equirectangular approximation, which for an area the size of Burning Man, is accurate down to the millimeter
@@ -208,17 +210,17 @@ def gps_dist(p1, p2):
 
   The returned distance will be in whatever units earth_radius is.
   """
-  φ1 = radians(p1[0])
-  φ2 = radians(p2[0])
-  Δλ = radians(p2[1] - p1[1])
+  lat1 = radians(p1[0])
+  lat2 = radians(p2[0])
+  delta_lon = radians(p2[1] - p1[1])
 
-  x = Δλ * cos((φ1 + φ2) / 2)
-  y = φ2 - φ1
-  return sqrt(x * x + y * y) * earth_radius
-
+  x = delta_lon * cos((lat1 + lat2) / 2)
+  y = lat2 - lat1
+  return (sqrt(x * x + y * y) * earth_radius,  # distance between the 2 points
+          atan2(y, x))  # angle in radians between the vector p1_p2 and the x axis
 
 def avg_fence_point_distance():
-  return round(sum([gps_dist(man_coords, p) for p in fence_point_coords]) / 5)
+  return round(sum([gps_dist(man_coords, p)[0] for p in fence_point_coords]) / 5)
 
 def output_code(img):
   """
@@ -233,6 +235,7 @@ def output_code(img):
   bytes_per_line = int(img.width / 8)
   lines = []
   last_non_empty = -1
+  skipped_beginning = 0 # how many lines we skipped from the beginning
   for i in range(0, len(bytes), bytes_per_line):
     # Get one image line (128 pixels) worth of bytes
     line = bytes[i:i+bytes_per_line]
@@ -240,23 +243,28 @@ def output_code(img):
     if any(line):  # if this is not an empty line
         last_non_empty = len(lines)
     elif last_non_empty == -1:
-      continue  # Skip empty lines at the beginning
+      # Skip empty lines at the beginning
+      skipped_beginning += 1
+      continue
 
     # Convert to hex
     lines.append("".join("0x{:02x}, ".format(x) for x in line))
 
 
   trimmed_lines = lines[0:last_non_empty+1]
-  code = "// Burning Man map, {0}x{1}px\n".format(img.width, len(trimmed_lines))
+  code = ""
+  code = code + "#define MAP_ANGLE      (HALF_PI - {})\n".format(gps_dist(man_coords, fence_point_coords[TOP_FENCE_PT])[1])
+  code = code + "#define FEET_PER_PIXEL {}\n".format(feet_per_pixel)
+  code = code + "#define MAN_X          {}  // Coordinates of the Man in the map, in pixels\n".format(center_px[0])
+  code = code + "#define MAN_Y          {}\n".format(center_px[1] - skipped_beginning)
+  code = code + "\n"
+  code = code + "// Burning Man map, {0}x{1}px\n".format(img.width, len(trimmed_lines))
   code = code + "const unsigned char map[] PROGMEM = {\n\t"
   code = code + "\n\t".join(trimmed_lines)
   code = code[:-2] + "\n};"
   print(code)
 
 
+
 if __name__ == '__main__':
   draw_map()
-
-# dists = [round(gps_dist(man_coords, p)) for p in fence_point_coords]
-# print(dists)  # [8242, 8140, 8040, 8135, 8216], avg dist 8155 ft
-# print(avg_fence_point_distance())

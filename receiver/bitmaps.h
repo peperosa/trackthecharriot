@@ -9,6 +9,14 @@
 const unsigned char up_arrow [] PROGMEM = { 0x10, 0x38, 0x7c, 0xfe, 0x38, 0x38, 0x38, 0x38 };
 const unsigned char dn_arrow [] PROGMEM = { 0x38, 0x38, 0x38, 0x38, 0xfe, 0x7c, 0x38, 0x10 };
 
+#define MAP_ANGLE      (HALF_PI - 0.7893299142641715)
+#define FEET_PER_PIXEL 88.06201550387597
+#define MAN_X          64  // Coordinates of the Man in the map, in pixels
+#define MAN_Y          93
+#define MAN_LAT        40785980  // Man coordinates in millionth of degrees
+#define MAN_LON      -119205840  // -119.20584 degrees
+
+
 // Burning Man map, 128x169px
 const unsigned char bm_map[] PROGMEM = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -5,10 +5,6 @@
 
 #include <RH_RF95.h>
 
-// Man position in degrees, with 5 decimal places (ie: 100,000ths of a degree)
-#define MAN_LAT     4078598  // 40.78598 degrees
-#define MAN_LON   -11920584  // -119.20584 degrees
-
 #define SENDER_ID      0x3f
 #define RECEIVER_ID    0x58
 #define MESSAGE_ID     0xad

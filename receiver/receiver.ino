@@ -12,12 +12,14 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define MAP_HEIGHT     (sizeof(bm_map) / 16)  // pixels
 #define SCREEN_HEIGHT  32  // pixels
 #define SCROLL_SPEED   4   // How many pixels we scroll the map on each button press
-#define MAN_X          64  // Coordinates of the Man in the map, in pixels
-#define MAN_Y          76
+#define MAX_DIST       10000  // (feet) Maximum distance to draw the target.
 
-int y_pos = 76;  // Current scrolling position
+// Radius of the Earth at the latitude of the Man, and 3,904 feet elevation - https://rechneronline.de/earth-radius/
+#define EARTH_RADIUS  20895853  // in feet (6,369,056 meters)
 
-uint32_t last_interaction_time = 0; // (milliseconds) When we last pressed any button. Used for auto-off.
+
+int y_pos = MAN_Y - SCREEN_HEIGHT/2;  // (pixels) Current scrolling position. Initialize it at the center.
+uint32_t last_interaction_time = 0;  // (milliseconds) When we last pressed any button. Used for auto-off.
 bool is_on = true;
 
 // Flags to check if a button was pressed
@@ -32,9 +34,23 @@ bool is_on = true;
 uint32_t btn_start_press_time[NUM_BUTTONS] = {0, 0};  // Keeps track of when we started pressing each button
 uint8_t btn_pins[NUM_BUTTONS] = {9, 5};  // Pin for each button
 
+int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
+int32_t char_lon = 0;  // longitude of the chariot, in millionths of degrees
+float char_dist = 0;    // (feet) distance of the chariot from the man
+float char_angle = 0;   // (radians) angle of the chariot relative to the man. 0 is at 3 o'clock, and it goes counter-clockwise
+
+//int32_t char_lat = 40782360; int32_t char_lon = -119235300; // BL
+//int32_t char_lat = 40805700; int32_t char_lon = -119219650; // TL
+//int32_t char_lat = 40801630; int32_t char_lon = -119185330; // top
+//int32_t char_lat = 40775680; int32_t char_lon = -119179710; // TR
+//int32_t char_lat = 40763730; int32_t char_lon = -119210500; // BR
+
 
 void setup() {
   Serial.begin(9600);
+  while (!Serial) {
+   delay(10);
+  }
   delay(100);
   Serial.println("Track The Chariot!");
 
@@ -50,6 +66,8 @@ void setup() {
 
   pinMode(btn_pins[0], INPUT_PULLUP);
   pinMode(btn_pins[1], INPUT_PULLUP);
+
+  foo();
 }
 
 void loop() {
@@ -83,10 +101,10 @@ void onLoop() {
   if (btn_status & BTN_DN_PRESS) {
     y_pos = min(y_pos + SCROLL_SPEED, MAP_HEIGHT - 32);
   }
-  if (btn_status & BTN_UP_LONG_PRESS || millis() > last_interaction_time + AUTO_OFF_DELAY) {
-    turnOff();
-    return;
-  }
+//  if (btn_status & BTN_UP_LONG_PRESS || millis() > last_interaction_time + AUTO_OFF_DELAY) {
+//    turnOff();
+//    return;
+//  }
 
   receive();
   updateDisplay();
@@ -150,13 +168,21 @@ bool receive()
     Serial.print(payload.fix_age_minutes);
     Serial.print(" - rssi: ");
     Serial.println(rf95.lastRssi(), DEC);
+
+    foo();
   }
 }
 
 void updateDisplay() {
   display.clearDisplay();
   display.drawBitmap(0, 0, bm_map + y_pos * 16, 128, 32, WHITE);
-  drawTarget(64, 50);
+
+  if (char_dist < MAX_DIST) {
+    int32_t x = MAN_X + round(cos(char_angle) * char_dist / FEET_PER_PIXEL);
+    int32_t y = MAN_Y - round(sin(char_angle) * char_dist / FEET_PER_PIXEL);
+    //Serial.print("x: "); Serial.print(x); Serial.print(" y: "); Serial.println(y);
+    drawTarget(x, y);
+  }
   display.display();
 }
 
@@ -204,3 +230,37 @@ void drawTarget(int x, int y) {
     display.drawCircle(x, y - y_pos, t / 64, WHITE);
   }
 }
+
+void foo() {
+
+  // lat/lon: in degrees
+  // phi/lam: latitude/longitude in radians
+//  var x = (lam2-lam1) * cos((phi1+phi2)/2);
+//  var y = (phi2-phi1);
+//  var d = sqrt(x*x + y*y) * R;
+
+  #define RAD(x) ((x)*PI/180000000.0)  // Converts from millionths of degrees to radians
+  float x = RAD(char_lon - MAN_LON) * cos(RAD((char_lat + MAN_LAT) / 2));
+  float y = RAD(char_lat - MAN_LAT);
+  #undef TO_RAD
+
+  char_dist = sqrt(x*x + y*y) * EARTH_RADIUS;
+  char_angle = atan2(y, x) + MAP_ANGLE;
+
+  Serial.print("x: "); Serial.println(x, 16);
+  Serial.print("y: "); Serial.println(y, 16);
+  Serial.print("char dist: "); Serial.println(char_dist);
+  Serial.print("char angle: "); Serial.println(char_angle, 16);
+}
+
+
+
+/*
+
+
+ ---------------------
+  Info at the bottom:
+  Batt: 100%
+  Signal: 4/5 (-73dbM)
+  Lat/lon
+ */
