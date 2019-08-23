@@ -7,7 +7,8 @@
 
 Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 
-#define AUTO_OFF_DELAY  5*60*1000 // (milliseconds) - how long to wait before turning the screen off
+#define BUTTON_B  6
+#define BUTTON_C  5
 #define MAP_HEIGHT     (sizeof(bm_map) / 16)  // pixels
 #define SCREEN_HEIGHT  32  // pixels
 #define SCROLL_SPEED   4   // How many pixels we scroll the map on each button press
@@ -18,21 +19,6 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 
 
 int y_pos = MAN_Y - SCREEN_HEIGHT/2;  // (pixels) Current scrolling position. Initialize it at the center.
-uint32_t last_interaction_time = 0;  // (milliseconds) When we last pressed any button. Used for auto-off.
-bool is_on = true;
-
-// Flags to check if a button was pressed
-#define BTN_UP_PRESS         1 << 0
-#define BTN_UP_LONG_PRESS    1 << 1
-#define BTN_DN_PRESS         1 << 2
-#define BTN_DN_LONG_PRESS    1 << 3
-
-#define NUM_BUTTONS   2
-#define LONG_PRESS_DURATION  3000
-
-uint32_t btn_start_press_time[NUM_BUTTONS] = {0, 0};  // Keeps track of when we started pressing each button
-uint8_t btn_pins[NUM_BUTTONS] = {9, 5};  // Pin for each button
-
 uint32_t fix_time = 0;  // Timestamp when we got the GPS fix. 0 if no valid fix received.
 int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
 int32_t char_lon = 0;  // longitude of the chariot, in millionths of degrees
@@ -42,8 +28,8 @@ float char_angle = 0;   // (radians) angle of the chariot relative to the man. 0
 void setup() {
   Serial.begin(9600);
 
-  pinMode(btn_pins[0], INPUT_PULLUP);
-  pinMode(btn_pins[1], INPUT_PULLUP);
+  pinMode(BUTTON_B, INPUT_PULLUP);
+  pinMode(BUTTON_C, INPUT_PULLUP);
 
   // Initialize the display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -60,72 +46,15 @@ void setup() {
 }
 
 void loop() {
-//  is_on ? onLoop() : offLoop();
-  onLoop();
-}
-
-// Main loop when we're powered off
-//void offLoop() {
-//  uint8_t btn_status = checkButtons();
-//  if (btn_status & BTN_UP_LONG_PRESS) {
-//    last_interaction_time = millis();
-//    turnOn();
-//    return;
-//  }
-//
-//  delay(300);  // TODO: Need use proper low power sleep
-//  //Watchdog.sleep(300); // low power, deep sleep NOTE: BROKEN, never wakes? Or maybe it does but display stays blank
-//}
-
-// Main loop when we're powered on
-void onLoop() {
-  uint8_t btn_status = checkButtons();
-
-  // If any button is pressed, update the last interaction time to now
-  if (btn_status) {
-    last_interaction_time = millis();
-  }
-  if (btn_status & BTN_UP_PRESS) {
+  if(!digitalRead(BUTTON_B)) {
     y_pos = max(y_pos - SCROLL_SPEED, 0);
   }
-  if (btn_status & BTN_DN_PRESS) {
+  if(!digitalRead(BUTTON_C)) {
     y_pos = min(y_pos + SCROLL_SPEED, MAP_HEIGHT);
   }
-//  if (btn_status & BTN_UP_LONG_PRESS || millis() > last_interaction_time + AUTO_OFF_DELAY) {
-//    turnOff();
-//    return;
-//  }
 
   receive();
   updateDisplay();
-}
-
-uint8_t checkButtons() {
-  uint8_t flags = 0;
-  flags |= checkOneButton(0) << 0;
-  flags |= checkOneButton(1) << 2;
-  return flags;
-}
-
-// Returns 00b if the button isn't pressed at all, 01b if it's pressed and 11b (ie: 3) if long pressed
-uint8_t checkOneButton(uint8_t index) {
-  bool pressed = !digitalRead(btn_pins[index]); // "not" because they're pulled up, so the pin is high when not pressed
-  if (pressed) {
-    // If we just started pressing, record the start time
-    if (btn_start_press_time[index] == 0) {
-      btn_start_press_time[index] = millis();
-    }
-    if  (millis() - btn_start_press_time[index] > LONG_PRESS_DURATION) {
-      btn_start_press_time[index] = 0;
-      return B00000011;
-    } else {
-      return B00000001;
-    }
-  } else {
-    // Button not pressed, reset start time to 0
-    btn_start_press_time[index] = 0;
-    return 0;
-  }
 }
 
 bool receive()
@@ -185,6 +114,10 @@ void updateDisplay() {
     printBatteryLevel();
     display.println();
     printClockAddress();
+    display.println();
+    display.print(char_lat);
+    display.print(", ");
+    display.print(char_lon);
   }
 
   // Draw the target if it's not too far away
@@ -195,29 +128,6 @@ void updateDisplay() {
   }
   display.display();
 }
-
-// Wake up all peripherals
-//void turnOn() {
-//  if (is_on) {
-//    return;
-//  }
-//  rf95.setModeRx();
-//  display.ssd1306_command(SSD1306_DISPLAYON);
-//  is_on = true;
-//}
-
-// Put all peripherals to sleep
-//void turnOff() {
-//  if (!is_on) {
-//    return;
-//  }
-//  Serial.println("Turning off");
-//  rf95.sleep();
-//  display.ssd1306_command(SSD1306_DISPLAYOFF);
-//  is_on = false;
-//  delay(1000); // Give it some time to debounce the buttons and make sure everything settles down
-//}
-
 
 /**
  * Draws an animated circle at pixel coordinates (x, y)
