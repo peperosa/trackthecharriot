@@ -20,6 +20,7 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 
 int y_pos = MAN_Y - SCREEN_HEIGHT/2;  // (pixels) Current scrolling position. Initialize it at the center.
 uint32_t fix_time = 0;  // Timestamp when we got the GPS fix. 0 if no valid fix received.
+uint32_t receive_time = 0; // when we received the last message
 int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
 int32_t char_lon = 0;  // longitude of the chariot, in millionths of degrees
 float char_dist = 0;    // (feet) distance of the chariot from the man
@@ -81,6 +82,7 @@ bool receive()
     char_lat = payload.lat;
     char_lon = payload.lon;
     fix_time = (payload.fix_age_minutes == INVALID_FIX_AGE) ? 0 : millis() - payload.fix_age_minutes * 60000;
+    receive_time = millis();
 
     updateDistanceAndAngle();
   }
@@ -110,7 +112,7 @@ void updateDisplay() {
   if (y_pos > MAP_HEIGHT - SCREEN_HEIGHT) {
     display.setCursor(0, MAP_HEIGHT - y_pos + 5);
     display.print("Signal: ");
-    display.print(rf95.lastRssi());
+    display.print((millis() - receive_time < 20000) ? rf95.lastRssi() : 0);
     printBatteryLevel();
     display.println();
     printClockAddress();
