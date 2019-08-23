@@ -173,8 +173,13 @@ void printClockAddress() {
 }
 
 void printBatteryLevel() {
-  float vbat = analogRead(A9) * 2 * 3.3 / 1024;
   display.print(" Bat: ");
-  display.print(vbat, 1);
-  display.print('V');
+  float vbat = analogRead(A9) * 2 * 3.3 / 1024;
+  // print battery as a percentage. Note: it's probably not super accurate
+  int8_t percent = (int8_t)((vbat - 3.2) * 100);
+  display.print(min(max(1, percent) , 100));
+  display.print('%');
+  // print volts:
+  //display.print(vbat, 1);
+  //display.print('V');
 }
