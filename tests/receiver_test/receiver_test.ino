@@ -199,8 +199,6 @@ void loop() {
   }  
   else
   { 
-    Serial.println("Receive not available");
-    Serial.println(String(sinceLastRX));      
     if (sinceLastRX < 0 || sinceLastRX > MAX_RX_INTERVAL) {      
         display.clearDisplay();
         display.setTextSize(1);
