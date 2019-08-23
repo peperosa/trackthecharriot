@@ -67,8 +67,7 @@ void readGPS() {
 }
 
 void transmitData() {
-  // Compute the fix age in minutes, cap it to 0xff if it's greater than that.
-  uint32_t age_minutes = (millis() - last_fix) / 601000;
+  uint32_t age_minutes = (millis() - last_fix) / 60000;
   payload.fix_age_minutes = (last_fix == 0 || age_minutes > MAX_FIX_AGE) ? INVALID_FIX_AGE :  age_minutes;
 
   rf95.setHeaderFrom(SENDER_ID);
