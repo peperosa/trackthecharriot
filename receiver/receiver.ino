@@ -2,7 +2,6 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <Adafruit_SleepyDog.h>
 #include <Chariot.h>
 #include "bitmaps.h"
 
@@ -34,58 +33,49 @@ bool is_on = true;
 uint32_t btn_start_press_time[NUM_BUTTONS] = {0, 0};  // Keeps track of when we started pressing each button
 uint8_t btn_pins[NUM_BUTTONS] = {9, 5};  // Pin for each button
 
+uint32_t fix_time = 0;  // When we got the GPS fix
 int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
 int32_t char_lon = 0;  // longitude of the chariot, in millionths of degrees
 float char_dist = 0;    // (feet) distance of the chariot from the man
 float char_angle = 0;   // (radians) angle of the chariot relative to the man. 0 is at 3 o'clock, and it goes counter-clockwise
 
-//int32_t char_lat = 40782360; int32_t char_lon = -119235300; // BL
-//int32_t char_lat = 40805700; int32_t char_lon = -119219650; // TL
-//int32_t char_lat = 40801630; int32_t char_lon = -119185330; // top
-//int32_t char_lat = 40775680; int32_t char_lon = -119179710; // TR
-//int32_t char_lat = 40763730; int32_t char_lon = -119210500; // BR
-
-
 void setup() {
   Serial.begin(9600);
-  while (!Serial) {
-   delay(10);
-  }
-  delay(100);
-  Serial.println("Track The Chariot!");
+
+  pinMode(btn_pins[0], INPUT_PULLUP);
+  pinMode(btn_pins[1], INPUT_PULLUP);
 
   // Initialize the display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(0, 0);
+  display.setCursor(10, 15);
+  display.println("Track The Chariot!");
   display.display();
 
+  delay(500); // Short delay to see the text
+
   initRadio(RECEIVER_ID);
-
-  pinMode(btn_pins[0], INPUT_PULLUP);
-  pinMode(btn_pins[1], INPUT_PULLUP);
-
-  foo();
 }
 
 void loop() {
-  is_on ? onLoop() : offLoop();
+//  is_on ? onLoop() : offLoop();
+  onLoop();
 }
 
 // Main loop when we're powered off
-void offLoop() {
-  uint8_t btn_status = checkButtons();
-  if (btn_status & BTN_UP_LONG_PRESS) {
-    last_interaction_time = millis();
-    turnOn();
-    return;
-  }
-
-  delay(300);  // TODO: Need use proper low power sleep
-  //Watchdog.sleep(300); // low power, deep sleep NOTE: BROKEN, never wakes? Or maybe it does but display stays blank
-}
+//void offLoop() {
+//  uint8_t btn_status = checkButtons();
+//  if (btn_status & BTN_UP_LONG_PRESS) {
+//    last_interaction_time = millis();
+//    turnOn();
+//    return;
+//  }
+//
+//  delay(300);  // TODO: Need use proper low power sleep
+//  //Watchdog.sleep(300); // low power, deep sleep NOTE: BROKEN, never wakes? Or maybe it does but display stays blank
+//}
 
 // Main loop when we're powered on
 void onLoop() {
@@ -99,7 +89,7 @@ void onLoop() {
     y_pos = max(y_pos - SCROLL_SPEED, 0);
   }
   if (btn_status & BTN_DN_PRESS) {
-    y_pos = min(y_pos + SCROLL_SPEED, MAP_HEIGHT - 32);
+    y_pos = min(y_pos + SCROLL_SPEED, MAP_HEIGHT);
   }
 //  if (btn_status & BTN_UP_LONG_PRESS || millis() > last_interaction_time + AUTO_OFF_DELAY) {
 //    turnOff();
@@ -156,57 +146,78 @@ bool receive()
     || rf95.headerFrom() != SENDER_ID
     || rf95.headerTo() != RECEIVER_ID
     || rf95.headerId() != MESSAGE_ID) {
-      Serial.println("Discarding unknown message");
       return false;
     }
 
-    Serial.print("RECEIVED ");
-    Serial.print(payload.lat);
-    Serial.print(", ");
-    Serial.print(payload.lon);
-    Serial.print(" - age: ");
-    Serial.print(payload.fix_age_minutes);
-    Serial.print(" - rssi: ");
-    Serial.println(rf95.lastRssi(), DEC);
+    char_lat = payload.lat;
+    char_lon = payload.lon;
+    fix_time = millis() - payload.fix_age_minutes * 60 * 1000;  // TODO: Handle special case when invalid fix age
 
-    foo();
+    updateDistanceAndAngle();
   }
 }
 
+// Converts the chariot GPS coordinates into a distance and angle relative to the Man
+void updateDistanceAndAngle() {
+# define RAD(x) ((x)*PI/180000000.0)  // Converts from millionths of degrees to radians
+  float x = RAD(char_lon - MAN_LON) * cos(RAD((char_lat + MAN_LAT) / 2));
+  float y = RAD(char_lat - MAN_LAT);
+# undef TO_RAD
+
+  char_dist = sqrt(x*x + y*y) * EARTH_RADIUS;
+  char_angle = atan2(y, x) + MAP_ANGLE;
+}
+
+
 void updateDisplay() {
   display.clearDisplay();
-  display.drawBitmap(0, 0, bm_map + y_pos * 16, 128, 32, WHITE);
 
+  // Draw the map, if we're not scrolled past it
+  if (y_pos < MAP_HEIGHT) {
+    display.drawBitmap(0, 0, bm_map + y_pos * 16, 128, min(32, MAP_HEIGHT - y_pos), WHITE);
+  }
+
+  // Draw the text, if visible
+  if (y_pos > MAP_HEIGHT - SCREEN_HEIGHT) {
+    display.setCursor(0, MAP_HEIGHT - y_pos + 5);
+    display.print("Signal: ");
+    display.print(rf95.lastRssi());
+    printBatteryLevel();
+    display.println();
+    printClockAddress();
+  }
+
+  // Draw the target if it's not too far away
+  // TODO: don't draw if we don't have a GPS fix yet
   if (char_dist < MAX_DIST) {
-    int32_t x = MAN_X + round(cos(char_angle) * char_dist / FEET_PER_PIXEL);
-    int32_t y = MAN_Y - round(sin(char_angle) * char_dist / FEET_PER_PIXEL);
-    //Serial.print("x: "); Serial.print(x); Serial.print(" y: "); Serial.println(y);
+    int16_t x = MAN_X + round(cos(char_angle) * char_dist / FEET_PER_PIXEL);
+    int16_t y = MAN_Y - round(sin(char_angle) * char_dist / FEET_PER_PIXEL);
     drawTarget(x, y);
   }
   display.display();
 }
 
 // Wake up all peripherals
-void turnOn() {
-  if (is_on) {
-    return;
-  }
-  rf95.setModeRx();
-  display.ssd1306_command(SSD1306_DISPLAYON);
-  is_on = true;
-}
+//void turnOn() {
+//  if (is_on) {
+//    return;
+//  }
+//  rf95.setModeRx();
+//  display.ssd1306_command(SSD1306_DISPLAYON);
+//  is_on = true;
+//}
 
 // Put all peripherals to sleep
-void turnOff() {
-  if (!is_on) {
-    return;
-  }
-  Serial.println("Turning off. Serial might break");
-  rf95.sleep();
-  display.ssd1306_command(SSD1306_DISPLAYOFF);
-  is_on = false;
-  delay(1000); // Give it some time to debounce the buttons and make sure everything settles down
-}
+//void turnOff() {
+//  if (!is_on) {
+//    return;
+//  }
+//  Serial.println("Turning off");
+//  rf95.sleep();
+//  display.ssd1306_command(SSD1306_DISPLAYOFF);
+//  is_on = false;
+//  delay(1000); // Give it some time to debounce the buttons and make sure everything settles down
+//}
 
 
 /**
@@ -214,7 +225,7 @@ void turnOff() {
  * If the circle would not be visible (because the screen is scrolled too far up or down)
  * draw a blinking arrow instead
  */
-void drawTarget(int x, int y) {
+void drawTarget(int16_t x, int16_t y) {
   // Take the time in milliseconds, modulo 512. This is used for the animation.
   int t = 512 - (millis() % 512);
 
@@ -226,41 +237,30 @@ void drawTarget(int x, int y) {
     if (t > 256) { display.drawBitmap(61, SCREEN_HEIGHT - 8, dn_arrow, 8, 8, WHITE); }
   } else {
     // Draw 2 animated circles converging to the target
-    display.drawCircle(x, y - y_pos, t / 32, WHITE);
-    display.drawCircle(x, y - y_pos, t / 64, WHITE);
+    display.drawCircle(x, y - y_pos, t / 20, WHITE);
+    display.drawCircle(x, y - y_pos, t / 60, WHITE);
   }
 }
 
-void foo() {
-
-  // lat/lon: in degrees
-  // phi/lam: latitude/longitude in radians
-//  var x = (lam2-lam1) * cos((phi1+phi2)/2);
-//  var y = (phi2-phi1);
-//  var d = sqrt(x*x + y*y) * R;
-
-  #define RAD(x) ((x)*PI/180000000.0)  // Converts from millionths of degrees to radians
-  float x = RAD(char_lon - MAN_LON) * cos(RAD((char_lat + MAN_LAT) / 2));
-  float y = RAD(char_lat - MAN_LAT);
-  #undef TO_RAD
-
-  char_dist = sqrt(x*x + y*y) * EARTH_RADIUS;
-  char_angle = atan2(y, x) + MAP_ANGLE;
-
-  Serial.print("x: "); Serial.println(x, 16);
-  Serial.print("y: "); Serial.println(y, 16);
-  Serial.print("char dist: "); Serial.println(char_dist);
-  Serial.print("char angle: "); Serial.println(char_angle, 16);
+/**
+ * Prints the chariot angle as a clock address (like 4:31)
+ */
+void printClockAddress() {
+  // There's 12*60 = 720 minutes around the clock, so convert the angle from radians to [0-720]
+  int16_t a = (int16_t)round((720 + 180 - char_angle * 360 / PI)) % 720;
+  int8_t hour = a / 60;
+  int8_t min = a % 60;
+  hour == 0 ? display.print(12) : display.print(hour);
+  display.print(':');
+  if (min < 10) {  // add leading 0
+    display.print(0);
+  }
+  display.print(min);
 }
 
-
-
-/*
-
-
- ---------------------
-  Info at the bottom:
-  Batt: 100%
-  Signal: 4/5 (-73dbM)
-  Lat/lon
- */
+void printBatteryLevel() {
+  float vbat = analogRead(A9) * 2 * 3.3 / 1024;
+  display.print(" Bat: ");
+  display.print(vbat, 1);
+  display.print('V');
+}

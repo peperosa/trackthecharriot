@@ -3,7 +3,6 @@
 #include <Chariot.h>
 
 #define GPSSerial Serial1
-//#define GPSSerial Serial
 
 TinyGPS gps;
 
@@ -18,7 +17,6 @@ void setup()
   pinMode(13, OUTPUT);
 
   Serial.begin(9600);
-  delay(100);
   Serial.println("Track The Chariot - transmitter");
 
   initRadio(SENDER_ID);
@@ -36,12 +34,13 @@ void loop() {
 }
 
 void readGPS() {
+//#define TEST
+#ifdef TEST
   last_fix = 100;
-  payload.lat = 123;
-  payload.lon = 456;
+  payload.lat = 40801630;
+  payload.lon = -119185330;
   return;
-
-
+#else
   // Read the next character from the GPS serial port and pass it to TinyGPS for decoding
   if (!GPSSerial.available() || !gps.encode(GPSSerial.read())) {
     return;  // We don't have a full sentence yet
@@ -64,6 +63,7 @@ void readGPS() {
   last_fix = millis() - age;
   payload.lat = lat;
   payload.lon = lon;
+#endif
 }
 
 void transmitData() {

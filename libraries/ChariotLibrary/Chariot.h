@@ -49,25 +49,21 @@ void initRadio(uint8_t address) {
   digitalWrite(RFM95_RST, HIGH); delay(10);
 
   if (!rf95.init()) {
-    Serial.println("LoRa radio init failed");
-    Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for detailed debug info");
+    Serial.println("radio init failed");
     die();
   }
-  Serial.println("LoRa radio init OK!");
 
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
 
   if (!rf95.setFrequency(RADIO_FREQUENCY)) {
-    Serial.println("setFrequency failed");
+    Serial.println("set freq failed");
     die();
   }
-  Serial.print("Set Freq to: ");
-  Serial.println(RADIO_FREQUENCY);
 
   // The default transmitter power is 13dBm, using PA_BOOST.
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then
   // you can set transmitter powers from 5 to 23 dBm:
-  //rf95.setTxPower(23, false);
+  rf95.setTxPower(23, false);
 
   rf95.setThisAddress(address);
   rf95.setPromiscuous(false);
