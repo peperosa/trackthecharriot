@@ -31,7 +31,7 @@ bool is_on = true;
 #define LONG_PRESS_DURATION  3000
 
 uint32_t btn_start_press_time[NUM_BUTTONS] = {0, 0};  // Keeps track of when we started pressing each button
-uint8_t btn_pins[NUM_BUTTONS] = {9, 5};  // Pin for each button
+uint8_t btn_pins[NUM_BUTTONS] = {5, 6};  // Pin for each button
 
 uint32_t fix_time = 0;  // Timestamp when we got the GPS fix. 0 if no valid fix received.
 int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
@@ -184,7 +184,9 @@ void updateDisplay() {
     display.print(rf95.lastRssi());
     printBatteryLevel();
     display.println();
-    printClockAddress();
+    printClockAddress();    
+    //display.println("Lat:" + String(char_lat));     
+    //display.println("Lon:" + String(char_lat)); 
   }
 
   // Draw the target if it's not too far away
