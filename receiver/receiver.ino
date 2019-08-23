@@ -33,7 +33,7 @@ bool is_on = true;
 uint32_t btn_start_press_time[NUM_BUTTONS] = {0, 0};  // Keeps track of when we started pressing each button
 uint8_t btn_pins[NUM_BUTTONS] = {9, 5};  // Pin for each button
 
-uint32_t fix_time = 0;  // When we got the GPS fix
+uint32_t fix_time = 0;  // Timestamp when we got the GPS fix. 0 if no valid fix received.
 int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
 int32_t char_lon = 0;  // longitude of the chariot, in millionths of degrees
 float char_dist = 0;    // (feet) distance of the chariot from the man
@@ -151,7 +151,7 @@ bool receive()
 
     char_lat = payload.lat;
     char_lon = payload.lon;
-    fix_time = millis() - payload.fix_age_minutes * 60 * 1000;  // TODO: Handle special case when invalid fix age
+    fix_time = (payload.fix_age_minutes == INVALID_FIX_AGE) ? 0 : millis() - payload.fix_age_minutes * 60000;
 
     updateDistanceAndAngle();
   }
@@ -188,8 +188,7 @@ void updateDisplay() {
   }
 
   // Draw the target if it's not too far away
-  // TODO: don't draw if we don't have a GPS fix yet
-  if (char_dist < MAX_DIST) {
+  if (char_dist < MAX_DIST && fix_time > 0) {
     int16_t x = MAN_X + round(cos(char_angle) * char_dist / FEET_PER_PIXEL);
     int16_t y = MAN_Y - round(sin(char_angle) * char_dist / FEET_PER_PIXEL);
     drawTarget(x, y);
@@ -246,6 +245,9 @@ void drawTarget(int16_t x, int16_t y) {
  * Prints the chariot angle as a clock address (like 4:31)
  */
 void printClockAddress() {
+  if (fix_time == 0) {
+    return;
+  }
   // There's 12*60 = 720 minutes around the clock, so convert the angle from radians to [0-720]
   int16_t a = (int16_t)round((720 + 180 - char_angle * 360 / PI)) % 720;
   int8_t hour = a / 60;

@@ -8,6 +8,8 @@
 #define SENDER_ID      0x3f
 #define RECEIVER_ID    0x58
 #define MESSAGE_ID     0xad
+#define MAX_FIX_AGE    30  // minutes. After that, we'll send INVALID_FIX_AGE
+#define INVALID_FIX_AGE 0xff
 
 
 // The data that we are going to send over the radio
@@ -16,9 +18,9 @@ struct Payload {
   int32_t lat = 0;
   int32_t lon = 0;
 
-  // How old the GPS fix is, in minutes. 1 byte, so max age is 255 minutes (~4h)
-  // This is set to 255 if we haven't gotten a fix yet or if it's more than 255 minutes.
-  uint8_t fix_age_minutes = 0xff;
+  // How old the GPS fix is, in minutes.
+  // Set to INVALID_FIX_AGE if we haven't gotten a fix yet or if it's more than 255 minutes.
+  uint8_t fix_age_minutes = INVALID_FIX_AGE;
 };
 
 // Radio settings
@@ -56,7 +58,7 @@ void initRadio(uint8_t address) {
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
 
   if (!rf95.setFrequency(RADIO_FREQUENCY)) {
-    Serial.println("set freq failed");
+//    Serial.println("set freq failed");
     die();
   }
 
