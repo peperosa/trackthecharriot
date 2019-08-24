@@ -26,12 +26,14 @@ float char_dist = 0;    // (feet) distance of the chariot from the man
 float char_angle = 0;   // (radians) angle of the chariot relative to the man. 0 is at 3 o'clock, and it goes counter-clockwise
 
 void setup() {
+  
   Serial.begin(9600);
 
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
 
   // Initialize the display
+  delay(1000); // needed most fo the time for the display to init
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
   display.setTextSize(1);
