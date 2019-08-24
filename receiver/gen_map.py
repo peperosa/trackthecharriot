@@ -257,10 +257,12 @@ def output_code(img):
   code = code + "#define FEET_PER_PIXEL {}\n".format(feet_per_pixel)
   code = code + "#define MAN_X          {}  // Coordinates of the Man in the map, in pixels\n".format(center_px[0])
   code = code + "#define MAN_Y          {}\n".format(center_px[1] - skipped_beginning)
+  code = code + "#define MAN_LAT        {}  // Man coordinates in millionth of degrees\n".format(int(man_coords[0]*1e6))
+  code = code + "#define MAN_LON      {}  // {} degrees\n".format(int(man_coords[1]*1e6), man_coords[1])
   code = code + "\n"
   code = code + "// Burning Man map, {0}x{1}px\n".format(img.width, len(trimmed_lines))
-  code = code + "const unsigned char map[] PROGMEM = {\n\t"
-  code = code + "\n\t".join(trimmed_lines)
+  code = code + "const unsigned char bm_map[] PROGMEM = {\n    "
+  code = code + "\n    ".join(trimmed_lines)
   code = code[:-2] + "\n};"
   print(code)
 
