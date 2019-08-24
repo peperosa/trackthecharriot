@@ -109,24 +109,8 @@
 // in the TRANSACTION_* macros.
 
 // Check first if Wire, then hardware SPI, then soft SPI:
-#define TRANSACTION_START   \
- if(wire) {                 \
-   SETWIRECLOCK;            \
- } else {                   \
-   if(spi) {                \
-     SPI_TRANSACTION_START; \
-   }                        \
-   SSD1306_SELECT;          \
- } ///< Wire, SPI or bitbang transfer setup
-#define TRANSACTION_END     \
- if(wire) {                 \
-   RESWIRECLOCK;            \
- } else {                   \
-   SSD1306_DESELECT;        \
-   if(spi) {                \
-     SPI_TRANSACTION_END;   \
-   }                        \
- } ///< Wire, SPI or bitbang transfer end
+#define TRANSACTION_START   SETWIRECLOCK;
+#define TRANSACTION_END     RESWIRECLOCK;
 
 // CONSTRUCTORS, DESTRUCTOR ------------------------------------------------
 
@@ -360,39 +344,29 @@ inline void Adafruit_SSD1306::SPIwrite(uint8_t d) {
 // must be started/ended in calling function for efficiency.
 // This is a private function, not exposed (see ssd1306_command() instead).
 void Adafruit_SSD1306::ssd1306_command1(uint8_t c) {
-  if(wire) { // I2C
-    wire->beginTransmission(i2caddr);
-    WIRE_WRITE((uint8_t)0x00); // Co = 0, D/C = 0
-    WIRE_WRITE(c);
-    wire->endTransmission();
-  } else { // SPI (hw or soft) -- transaction started in calling function
-    SSD1306_MODE_COMMAND
-    SPIwrite(c);
-  }
+  wire->beginTransmission(i2caddr);
+  WIRE_WRITE((uint8_t)0x00); // Co = 0, D/C = 0
+  WIRE_WRITE(c);
+  wire->endTransmission();
 }
 
 // Issue list of commands to SSD1306, same rules as above re: transactions.
 // This is a private function, not exposed.
 void Adafruit_SSD1306::ssd1306_commandList(const uint8_t *c, uint8_t n) {
-  if(wire) { // I2C
-    wire->beginTransmission(i2caddr);
-    WIRE_WRITE((uint8_t)0x00); // Co = 0, D/C = 0
-    uint8_t bytesOut = 1;
-    while(n--) {
-      if(bytesOut >= WIRE_MAX) {
-        wire->endTransmission();
-        wire->beginTransmission(i2caddr);
-        WIRE_WRITE((uint8_t)0x00); // Co = 0, D/C = 0
-        bytesOut = 1;
-      }
-      WIRE_WRITE(pgm_read_byte(c++));
-      bytesOut++;
+  wire->beginTransmission(i2caddr);
+  WIRE_WRITE((uint8_t)0x00); // Co = 0, D/C = 0
+  uint8_t bytesOut = 1;
+  while(n--) {
+    if(bytesOut >= WIRE_MAX) {
+      wire->endTransmission();
+      wire->beginTransmission(i2caddr);
+      WIRE_WRITE((uint8_t)0x00); // Co = 0, D/C = 0
+      bytesOut = 1;
     }
-    wire->endTransmission();
-  } else { // SPI -- transaction started in calling function
-    SSD1306_MODE_COMMAND
-    while(n--) SPIwrite(pgm_read_byte(c++));
+    WIRE_WRITE(pgm_read_byte(c++));
+    bytesOut++;
   }
+  wire->endTransmission();
 }
 
 // A public version of ssd1306_command1(), for existing user code that
@@ -455,53 +429,17 @@ boolean Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, boolean reset,
     return false;
 
   clearDisplay();
-  if(HEIGHT > 32) {
-    drawBitmap((WIDTH - splash1_width) / 2, (HEIGHT - splash1_height) / 2,
-      splash1_data, splash1_width, splash1_height, 1);
-  } else {
-    drawBitmap((WIDTH - splash2_width) / 2, (HEIGHT - splash2_height) / 2,
-      splash2_data, splash2_width, splash2_height, 1);
-  }
-
   vccstate = vcs;
 
   // Setup pin directions
-  if(wire) { // Using I2C
-    // If I2C address is unspecified, use default
-    // (0x3C for 32-pixel-tall displays, 0x3D for all others).
-    i2caddr = addr ? addr : ((HEIGHT == 32) ? 0x3C : 0x3D);
-    // TwoWire begin() function might be already performed by the calling
-    // function if it has unusual circumstances (e.g. TWI variants that
-    // can accept different SDA/SCL pins, or if two SSD1306 instances
-    // with different addresses -- only a single begin() is needed).
-    if(periphBegin) wire->begin();
-  } else { // Using one of the SPI modes, either soft or hardware
-    pinMode(dcPin, OUTPUT); // Set data/command pin as output
-    pinMode(csPin, OUTPUT); // Same for chip select
-#ifdef HAVE_PORTREG
-    dcPort    = (PortReg *)portOutputRegister(digitalPinToPort(dcPin));
-    dcPinMask = digitalPinToBitMask(dcPin);
-    csPort    = (PortReg *)portOutputRegister(digitalPinToPort(csPin));
-    csPinMask = digitalPinToBitMask(csPin);
-#endif
-    SSD1306_DESELECT
-    if(spi) { // Hardware SPI
-      // SPI peripheral begin same as wire check above.
-      if(periphBegin) spi->begin();
-    } else {  // Soft SPI
-      pinMode(mosiPin, OUTPUT); // MOSI and SCLK outputs
-      pinMode(clkPin , OUTPUT);
-#ifdef HAVE_PORTREG
-      mosiPort    = (PortReg *)portOutputRegister(digitalPinToPort(mosiPin));
-      mosiPinMask = digitalPinToBitMask(mosiPin);
-      clkPort     = (PortReg *)portOutputRegister(digitalPinToPort(clkPin));
-      clkPinMask  = digitalPinToBitMask(clkPin);
-      *clkPort   &= ~clkPinMask; // Clock low
-#else
-      digitalWrite(clkPin, LOW); // Clock low
-#endif
-    }
-  }
+  // If I2C address is unspecified, use default
+  // (0x3C for 32-pixel-tall displays, 0x3D for all others).
+  i2caddr = addr ? addr : ((HEIGHT == 32) ? 0x3C : 0x3D);
+  // TwoWire begin() function might be already performed by the calling
+  // function if it has unusual circumstances (e.g. TWI variants that
+  // can accept different SDA/SCL pins, or if two SSD1306 instances
+  // with different addresses -- only a single begin() is needed).
+  if(periphBegin) wire->begin();
 
   // Reset SSD1306 if requested and reset pin specified in constructor
   if(reset && (rstPin >= 0)) {
@@ -905,25 +843,20 @@ void Adafruit_SSD1306::display(void) {
 #endif
   uint16_t count = WIDTH * ((HEIGHT + 7) / 8);
   uint8_t *ptr   = buffer;
-  if(wire) { // I2C
-    wire->beginTransmission(i2caddr);
-    WIRE_WRITE((uint8_t)0x40);
-    uint8_t bytesOut = 1;
-    while(count--) {
-      if(bytesOut >= WIRE_MAX) {
-        wire->endTransmission();
-        wire->beginTransmission(i2caddr);
-        WIRE_WRITE((uint8_t)0x40);
-        bytesOut = 1;
-      }
-      WIRE_WRITE(*ptr++);
-      bytesOut++;
+  wire->beginTransmission(i2caddr);
+  WIRE_WRITE((uint8_t)0x40);
+  uint8_t bytesOut = 1;
+  while(count--) {
+    if(bytesOut >= WIRE_MAX) {
+      wire->endTransmission();
+      wire->beginTransmission(i2caddr);
+      WIRE_WRITE((uint8_t)0x40);
+      bytesOut = 1;
     }
-    wire->endTransmission();
-  } else { // SPI
-    SSD1306_MODE_DATA
-    while(count--) SPIwrite(*ptr++);
+    WIRE_WRITE(*ptr++);
+    bytesOut++;
   }
+  wire->endTransmission();
   TRANSACTION_END
 #if defined(ESP8266)
   yield();
