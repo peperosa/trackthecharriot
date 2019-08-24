@@ -24,20 +24,9 @@
 #ifndef _Adafruit_SSD1306_H_
 #define _Adafruit_SSD1306_H_
 
-// ONE of the following three lines must be #defined:
-//#define SSD1306_128_64 ///< DEPRECTAED: old way to specify 128x64 screen
 #define SSD1306_128_32   ///< DEPRECATED: old way to specify 128x32 screen
-//#define SSD1306_96_16  ///< DEPRECATED: old way to specify 96x16 screen
-// This establishes the screen dimensions in old Adafruit_SSD1306 sketches
-// (NEW CODE SHOULD IGNORE THIS, USE THE CONSTRUCTORS THAT ACCEPT WIDTH
-// AND HEIGHT ARGUMENTS).
-
-#if defined(ARDUINO_STM32_FEATHER)
-  typedef class HardwareSPI SPIClass;
-#endif
 
 #include <Wire.h>
-#include <SPI.h>
 #include <Adafruit_GFX.h>
 
 #if defined(__AVR__)
@@ -115,16 +104,11 @@
 class Adafruit_SSD1306 : public Adafruit_GFX {
  public:
   // NEW CONSTRUCTORS -- recommended for new projects
-  Adafruit_SSD1306(uint8_t w, uint8_t h, TwoWire *twi=&Wire, int8_t rst_pin=-1,
-    uint32_t clkDuring=400000UL, uint32_t clkAfter=100000UL);
-  Adafruit_SSD1306(uint8_t w, uint8_t h, int8_t mosi_pin, int8_t sclk_pin,
-    int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
-  Adafruit_SSD1306(uint8_t w, uint8_t h, SPIClass *spi,
-    int8_t dc_pin, int8_t rst_pin, int8_t cs_pin, uint32_t bitrate=8000000UL);
+  Adafruit_SSD1306(uint8_t w, uint8_t h, TwoWire *twi=&Wire, int8_t rst_pin=-1, uint32_t clkDuring=400000UL, uint32_t clkAfter=100000UL);
+  Adafruit_SSD1306(uint8_t w, uint8_t h, int8_t mosi_pin, int8_t sclk_pin, int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
 
   // DEPRECATED CONSTRUCTORS - for back compatibility, avoid in new projects
-  Adafruit_SSD1306(int8_t mosi_pin, int8_t sclk_pin, int8_t dc_pin,
-    int8_t rst_pin, int8_t cs_pin);
+  Adafruit_SSD1306(int8_t mosi_pin, int8_t sclk_pin, int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
   Adafruit_SSD1306(int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
   Adafruit_SSD1306(int8_t rst_pin = -1);
 
@@ -150,7 +134,6 @@ class Adafruit_SSD1306 : public Adafruit_GFX {
   uint8_t     *getBuffer(void);
 
  private:
-  inline void  SPIwrite(uint8_t d) __attribute__((always_inline));
   void         drawFastHLineInternal(int16_t x, int16_t y, int16_t w,
                  uint16_t color);
   void         drawFastVLineInternal(int16_t x, int16_t y, int16_t h,
@@ -158,7 +141,6 @@ class Adafruit_SSD1306 : public Adafruit_GFX {
   void         ssd1306_command1(uint8_t c);
   void         ssd1306_commandList(const uint8_t *c, uint8_t n);
 
-  SPIClass    *spi;
   TwoWire     *wire;
   uint8_t     *buffer;
   int8_t       i2caddr, vccstate, page_end;
