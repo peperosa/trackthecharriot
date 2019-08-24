@@ -105,12 +105,9 @@ class Adafruit_SSD1306 : public Adafruit_GFX {
  public:
   // NEW CONSTRUCTORS -- recommended for new projects
   Adafruit_SSD1306(uint8_t w, uint8_t h, TwoWire *twi=&Wire, int8_t rst_pin=-1, uint32_t clkDuring=400000UL, uint32_t clkAfter=100000UL);
-  Adafruit_SSD1306(uint8_t w, uint8_t h, int8_t mosi_pin, int8_t sclk_pin, int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
 
   // DEPRECATED CONSTRUCTORS - for back compatibility, avoid in new projects
-  Adafruit_SSD1306(int8_t mosi_pin, int8_t sclk_pin, int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
   Adafruit_SSD1306(int8_t dc_pin, int8_t rst_pin, int8_t cs_pin);
-  Adafruit_SSD1306(int8_t rst_pin = -1);
 
   ~Adafruit_SSD1306(void);
 
