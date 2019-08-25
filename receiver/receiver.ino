@@ -12,13 +12,21 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define SCREEN_HEIGHT  32  // pixels
 #define SCROLL_SPEED   4   // How many pixels we scroll the map on each button press
 #define MAX_DIST       10000  // (feet) Maximum distance to draw the target.
+#define SECONDS        1000
+#define MINUTES        (60 * SECONDS)
 
 // Radius of the Earth at the latitude of the Man, and 3,904 feet elevation - https://rechneronline.de/earth-radius/
 #define EARTH_RADIUS  20895853  // in feet (6,369,056 meters)
 
+// Distance in feet between the Man and the center of each road
+// Source: https://bm-innovate.s3.amazonaws.com/2019/2019_BRC_Measurements.pdf
+int16_t roads[]   = {2500, 2940, 3230, 3520, 3810, 4100, 4340, 4580, 4820, 5060, 5300, 5490, 5680};
+char road_names[] = {'E',  'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',  'J',  'K',  'L'};
+#define NUM_ROADS   (sizeof(roads) / sizeof(roads[0]))
+#define ROAD_WIDTH  40
 
-int y_pos = MAN_Y - SCREEN_HEIGHT/2;  // (pixels) Current scrolling position. Initialize it at the center.
-uint32_t fix_time = 0;  // Timestamp when we got the GPS fix. 0 if no valid fix received.
+int16_t y_pos = MAN_Y - SCREEN_HEIGHT/2;  // (pixels) Current scrolling position. Initialize it at the center.
+int32_t fix_time = 0;  // Timestamp when we got the GPS fix. 0 if no valid fix received. Note: this might be negative.
 uint32_t receive_time = 0; // when we received the last message
 int32_t char_lat = 0;  // latitude of the chariot, in millionths of degrees
 int32_t char_lon = 0;  // longitude of the chariot, in millionths of degrees
@@ -26,7 +34,7 @@ float char_dist = 0;    // (feet) distance of the chariot from the man
 float char_angle = 0;   // (radians) angle of the chariot relative to the man. 0 is at 3 o'clock, and it goes counter-clockwise
 
 void setup() {
-  
+
   Serial.begin(9600);
 
   pinMode(BUTTON_B, INPUT_PULLUP);
@@ -82,7 +90,11 @@ bool receive()
 
     char_lat = payload.lat;
     char_lon = payload.lon;
-    fix_time = (payload.fix_age_minutes == INVALID_FIX_AGE) ? 0 : millis() - payload.fix_age_minutes * 60000;
+
+    fix_time = (payload.fix_age_minutes != INVALID_FIX_AGE)
+        ? millis() - payload.fix_age_minutes * MINUTES
+        : 0;
+
     receive_time = millis();
 
     updateDistanceAndAngle();
@@ -109,27 +121,38 @@ void updateDisplay() {
     display.drawBitmap(0, 0, bm_map + y_pos * 16, 128, min(32, MAP_HEIGHT - y_pos), WHITE);
   }
 
+  bool valid_fix = isValidFix();
+
   // Draw the text, if visible
   if (y_pos > MAP_HEIGHT - SCREEN_HEIGHT) {
     display.setCursor(0, MAP_HEIGHT - y_pos + 5);
-    display.print("Signal: ");
-    display.print((millis() - receive_time < 20000) ? rf95.lastRssi() : 0);
-    printBatteryLevel();
+    printBatteryAndSignal();
     display.println();
-    printClockAddress();
-    display.println();
-    display.print(char_lat);
-    display.print(", ");
-    display.print(char_lon);
+    if (valid_fix) {
+      printClockAddress();
+      printFixAge();
+      display.println();
+      display.print(char_lat);
+      display.print(", ");
+      display.print(char_lon);
+    } else {
+      display.print("Waiting for GPS");
+    }
   }
 
   // Draw the target if it's not too far away
-  if (char_dist < MAX_DIST && fix_time > 0) {
+  if (char_dist < MAX_DIST && valid_fix) {
     int16_t x = MAN_X + round(cos(char_angle) * char_dist / FEET_PER_PIXEL);
     int16_t y = MAN_Y - round(sin(char_angle) * char_dist / FEET_PER_PIXEL);
     drawTarget(x, y);
   }
+
   display.display();
+}
+
+// If the fix is older than 30 minutes, consider it invalid
+bool isValidFix() {
+  return fix_time != 0 && (int32_t)millis() - fix_time < 30 * MINUTES;
 }
 
 /**
@@ -139,7 +162,7 @@ void updateDisplay() {
  */
 void drawTarget(int16_t x, int16_t y) {
   // Take the time in milliseconds, modulo 512. This is used for the animation.
-  int t = 512 - (millis() % 512);
+  int16_t t = 512 - (millis() % 512);
 
   if (y_pos > y + 7) {
     // Target is too high, draw a blinking up arrow
@@ -158,22 +181,84 @@ void drawTarget(int16_t x, int16_t y) {
  * Prints the chariot angle as a clock address (like 4:31)
  */
 void printClockAddress() {
-  if (fix_time == 0) {
-    return;
-  }
   // There's 12*60 = 720 minutes around the clock, so convert the angle from radians to [0-720]
   int16_t a = (int16_t)round((720 + 180 - char_angle * 360 / PI)) % 720;
   int8_t hour = a / 60;
   int8_t min = a % 60;
+
+  // Print the radial street
   hour == 0 ? display.print(12) : display.print(hour);
   display.print(':');
   if (min < 10) {  // add leading 0
     display.print(0);
   }
   display.print(min);
+
+  // Print the annular, if we're between 1:50 and 10:10
+  if (a > 110 && a < 610) {
+    printRoad();
+  } else {
+    if (char_dist > roads[NUM_ROADS - 1]) {
+      display.print(" deep playa");
+    }
+  }
 }
 
-void printBatteryLevel() {
+// Prints the name of the annular road we're on
+// Note: we have max 10 chars for this
+void printRoad() {
+  int16_t dist = (int16_t) char_dist;
+
+  // If we're in the inner playa, don't print anything
+  if (dist < roads[0] - ROAD_WIDTH ) {
+    return;
+  }
+
+  for (uint8_t i = 0; i < NUM_ROADS; i++) {
+    // On the road
+    if (abs(dist - roads[i]) < ROAD_WIDTH) {
+      display.print(" & ");
+      printRoadName(i);
+      return;
+    }
+    // between two roads
+    if (dist < roads[i]) {
+      display.print(" btw ");
+      printRoadName(i - 1);
+      display.print(" & ");
+      display.print(road_names[i]);  // no need to call printRoadName since we know it cannot be Esplanade
+      return;
+    }
+  }
+  display.print(" beyond ");
+  display.print(road_names[NUM_ROADS - 1]);
+}
+
+void printRoadName(uint8_t index) {
+  if (index == 0) {
+    display.print("Esp");
+  } else {
+    display.print(road_names[index]);
+  }
+}
+
+void printFixAge() {
+  int16_t age_minutes = (millis() - fix_time) / MINUTES;
+  display.print(' ');
+  display.print(age_minutes);
+  display.print('m');
+}
+
+void printBatteryAndSignal() {
+  // Signal level
+  if (receive_time != 0 && millis() - receive_time < 20 * SECONDS) {
+    display.print("Signal: ");
+    display.print(100 + rf95.lastRssi()); // add 100 to convert from negative to positive range, which is more intuitive
+  } else {
+    display.print("No signal.");
+  }
+
+  // Battery level
   display.print(" Bat: ");
   float vbat = analogRead(A9) * 2 * 3.3 / 1024;
   // print battery as a percentage. Note: it's probably not super accurate
