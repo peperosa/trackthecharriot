@@ -13,7 +13,7 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define SCROLL_SPEED   4   // How many pixels we scroll the map on each button press
 #define MAX_DIST       10000  // (feet) Maximum distance to draw the target.
 #define SECONDS        1000
-#define MINUTES        (60 * SECONDS)
+#define MINUTES        60000
 
 // Radius of the Earth at the latitude of the Man, and 3,904 feet elevation - https://rechneronline.de/earth-radius/
 #define EARTH_RADIUS  20895853  // in feet (6,369,056 meters)
@@ -67,10 +67,10 @@ void loop() {
   updateDisplay();
 }
 
-bool receive()
+void receive()
 {
   if (!rf95.available()) {
-    return false;
+    return;
   }
 
   Payload payload;
@@ -85,14 +85,14 @@ bool receive()
     || rf95.headerFrom() != SENDER_ID
     || rf95.headerTo() != RECEIVER_ID
     || rf95.headerId() != MESSAGE_ID) {
-      return false;
+      return;
     }
 
     char_lat = payload.lat;
     char_lon = payload.lon;
 
     fix_time = (payload.fix_age_minutes != INVALID_FIX_AGE)
-        ? millis() - payload.fix_age_minutes * MINUTES
+        ? millis() - (int32_t)payload.fix_age_minutes * MINUTES
         : 0;
 
     receive_time = millis();

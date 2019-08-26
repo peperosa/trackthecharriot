@@ -36,9 +36,10 @@ void loop() {
 void readGPS() {
 //#define TEST
 #ifdef TEST
-  last_fix = 100;
-  payload.lat = 40801630;
-  payload.lon = -119185330;
+  payload.lat = random(40772303, 40800635);
+  payload.lon = random(-119189321, -119226709);
+  last_fix = max(millis() - random(0, 40) * 60000, 1);
+  delay(200);
   return;
 #else
   // Read the next character from the GPS serial port and pass it to TinyGPS for decoding
