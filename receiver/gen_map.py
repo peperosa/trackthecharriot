@@ -15,15 +15,15 @@ from PIL import Image, ImageDraw
 from math import *
 
 # GPS coordinates of the man
-man_coords = (40.78598, -119.20584)
+man_coords = (40.786400, -119.203500)
 
 # GPS coordinates of each fence point
 fence_point_coords = [
-  (40.78236, -119.23530),  # bottom left
-  (40.80570, -119.21965),  # top left
-  (40.80163, -119.18533),  # top point (directly above the Man)
-  (40.77568, -119.17971),  # top right
-  (40.76373, -119.21050),  # bottom right
+  (40.782814, -119.233566),  # bottom left
+  (40.807028, -119.217274),  # top left
+  (40.802722, -119.181931),  # top point (directly above the Man)
+  (40.775857, -119.176407),  # top right
+  (40.763558, -119.208301),  # bottom right
 ]
 
 TOP_FENCE_PT = 2  # index in fence_point_coords of the top fence point
@@ -37,7 +37,7 @@ center_px = (int(img_width / 2), int(img_height / 2))
 
 # Average distance in feet between the Man and each fence point.
 # Use avg_fence_point_distance() below to calculate
-fence_point_dist = 8155
+fence_point_dist = 8420
 
 # Radius of the Earth in feet at the latitude of the Man, and 3,904 feet elevation - https://rechneronline.de/earth-radius/
 earth_radius = 6369056 * 3.2808  # feet
@@ -53,18 +53,17 @@ roads = [
   3520,  # Center of C road
   3810,  # Center of D road
   4100,  # Center of E road
-  4340,  # Center of F road
-  4580,  # Center of G road
-  4820,  # Center of H road
-  5060,  # Center of I road
-  5300,  # Center of J road
-  5490,  # Center of K road
-  5680,  # Center of L road
+  4590,  # Center of F road
+  4880,  # Center of G road
+  5170,  # Center of H road
+  5460,  # Center of I road
+  5650,  # Center of J road
+  5845,  # Center of K road
+  5845,  # Center of K again because we need an even number
 ]
 
 # Indices of some roads in the list above
 ESP = 0
-L = 12
 
 # Distance in feet from the Man to the center of Center Camp
 center_camp_dist = 3026
@@ -74,7 +73,7 @@ center_camp_radius = 783
 
 # Scale we want to use for the map
 # We use the diameter of the outer road so that the city fills the screen horizontally
-feet_per_pixel = 2 * roads[L] / img_width
+feet_per_pixel = 2 * roads[-1] / img_width
 
 
 def ft(x):
@@ -112,12 +111,12 @@ def draw_map():
   draw = ImageDraw.Draw(im)
 
   # Annulars: draw every other road
-  for road in [roads[i] for i in range(ESP, L + 1, 2)]:
+  for road in [roads[i] for i in range(ESP, len(roads), 2)]:
     draw.point(circle_points(center_px, ft(road), h2deg(2), h2deg(10)), fill='white')
 
   # Radials: draw every half hour
   for h in range(2 * 2, 2 * 10 + 1):
-    draw.line([polar2px(h2deg(h / 2), roads[ESP]), polar2px(h2deg(h / 2), roads[L])], 'white', 1)
+    draw.line([polar2px(h2deg(h / 2), roads[ESP]), polar2px(h2deg(h / 2), roads[-1])], 'white', 1)
 
   # Center camp
   cc_pos = ((center_px[0]), (center_px[1] + ft(center_camp_dist)))
@@ -152,7 +151,7 @@ def draw_map():
   del draw
   im.save('map.png')
   output_code(im)
-  # im.show()
+  im.show()
 
 
 def circle_points(center, radius, start=0, end=0):

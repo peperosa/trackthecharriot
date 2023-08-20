@@ -19,9 +19,9 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #define EARTH_RADIUS  20895853  // in feet (6,369,056 meters)
 
 // Distance in feet between the Man and the center of each road
-// Source: https://bm-innovate.s3.amazonaws.com/2019/2019_BRC_Measurements.pdf
-int16_t roads[]   = {2500, 2940, 3230, 3520, 3810, 4100, 4340, 4580, 4820, 5060, 5300, 5490, 5680};
-char road_names[] = {'E',  'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',  'J',  'K',  'L'};
+// Source: https://bm-innovate.s3.amazonaws.com/2023/2023%20BRC%20Measurements.pdf
+int16_t roads[]   = {2500, 2940, 3230, 3520, 3810, 4100, 4590, 4880, 5170, 5460, 5650, 5845};
+char road_names[] = {'E',  'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',  'J',  'K'};
 #define NUM_ROADS   (sizeof(roads) / sizeof(roads[0]))
 #define ROAD_WIDTH  40
 
@@ -46,8 +46,8 @@ void setup() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(10, 15);
-  display.println("Track The Chariot!");
+  display.setCursor(40, 15);
+  display.println("BRC 2023!");
   display.display();
 
   delay(500); // Short delay to see the text
